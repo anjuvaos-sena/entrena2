@@ -63,7 +63,7 @@
                         <div class="col-12 col-md-6">
                             <label class="form-label fw-semibold" for="archivo_pdf">Requisitos exigidos (PDF)</label>
                             <input class="form-control sena-input" id="archivo_pdf" name="archivo_pdf" type="file" accept="application/pdf,.pdf" required>
-                            <small class="form-text text-muted">Solo se acepta un archivo PDF.</small>
+                            <small class="form-text text-muted">Solo se acepta un archivo PDF de hasta {{ max_pdf_size_mb }} MB.</small>
                         </div>
                         <div class="col-12 d-flex flex-column flex-sm-row justify-content-end gap-2 mt-4">
                             <a class="sena-btn sena-btn-outline" href="{% url 'app_inscripciones:capacitaciones_publicadas' %}">Cancelar</a>

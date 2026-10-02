@@ -27,14 +27,13 @@ class Inscripcion(models.Model):
 
 	def clean(self):
 		"""Valida que el archivo asociado sea un PDF."""
-		errores = {}
 		if self.archivo_pdf:
-			nombre = self.archivo_pdf.name.lower()
-			tipo = getattr(self.archivo_pdf, 'content_type', '')
-			if not nombre.endswith('.pdf') or tipo != 'application/pdf':
-				errores['archivo_pdf'] = 'El archivo debe ser un PDF válido.'
-		if errores:
-			raise ValidationError(errores)
+			from .validators import validate_pdf_file
+
+			try:
+				validate_pdf_file(self.archivo_pdf)
+			except ValidationError as error:
+				raise ValidationError({'archivo_pdf': error.messages}) from error
 
 	def __str__(self):
 		"""Devuelve una representación legible de la inscripción."""

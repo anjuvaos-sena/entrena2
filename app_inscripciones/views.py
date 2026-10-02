@@ -1,12 +1,14 @@
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import F, Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.core.validators import validate_email
 
 from app_convocatorias.models import Convocatoria
 
 from .models import Inscripcion
+from .validators import MAX_PDF_FILE_SIZE_MB, validate_pdf_file
 
 
 def _requiere_instructor(request):
@@ -31,8 +33,6 @@ def _datos_inscripcion(request):
 		if not valor:
 			errores[nombre] = 'Este campo es obligatorio.'
 
-	from django.core.validators import validate_email
-	from django.core.exceptions import ValidationError
 	try:
 		validate_email(datos['correo_electronico'])
 	except ValidationError:
@@ -42,11 +42,11 @@ def _datos_inscripcion(request):
 	archivo_pdf = request.FILES.get('archivo_pdf')
 	if archivo_pdf is None:
 		errores['archivo_pdf'] = 'Debe adjuntar un archivo PDF.'
-	elif (
-		not archivo_pdf.name.lower().endswith('.pdf')
-		or archivo_pdf.content_type != 'application/pdf'
-	):
-		errores['archivo_pdf'] = 'Solo se aceptan archivos PDF.'
+	else:
+		try:
+			validate_pdf_file(archivo_pdf)
+		except ValidationError as error:
+			errores['archivo_pdf'] = error.messages[0]
 
 	return datos, archivo_pdf, errores
 
@@ -135,10 +135,19 @@ def crear_inscripcion_view(request, convocatoria_id):
 					return render(
 						request,
 						'app_inscripciones/app_inscripciones_form.html',
-						{'convocatoria': convocatoria, 'confirmacion': True},
+						{
+							'convocatoria': convocatoria,
+							'confirmacion': True,
+							'max_pdf_size_mb': MAX_PDF_FILE_SIZE_MB,
+						},
 					)
 	return render(
 		request,
 		'app_inscripciones/app_inscripciones_form.html',
-		{'convocatoria': convocatoria, 'datos': datos, 'errores': errores},
+		{
+			'convocatoria': convocatoria,
+			'datos': datos,
+			'errores': errores,
+			'max_pdf_size_mb': MAX_PDF_FILE_SIZE_MB,
+		},
 	)
