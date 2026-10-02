@@ -11,9 +11,11 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 from pathlib import Path
-from django.core.management.utils import get_random_secret_key
 import os
+
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
+from django.core.management.utils import get_random_secret_key
 
 
 
@@ -28,10 +30,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get("SECRET_KEY") or get_random_secret_key()
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get("DEBUG", "True") == "True"
-
 ALLOWED_HOSTS = []
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
+DEBUG = os.environ.get(
+    'DEBUG',
+    'False' if RENDER_EXTERNAL_HOSTNAME else 'True',
+) == 'True'
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS.append (RENDER_EXTERNAL_HOSTNAME)
 
@@ -130,6 +134,55 @@ if not DEBUG:
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+if not DEBUG:
+    supabase_storage_settings = {
+        'SUPABASE_STORAGE_BUCKET': os.environ.get('SUPABASE_STORAGE_BUCKET'),
+        'SUPABASE_S3_ENDPOINT': os.environ.get('SUPABASE_S3_ENDPOINT'),
+        'SUPABASE_S3_REGION': os.environ.get('SUPABASE_S3_REGION'),
+        'SUPABASE_S3_ACCESS_KEY_ID': os.environ.get('SUPABASE_S3_ACCESS_KEY_ID'),
+        'SUPABASE_S3_SECRET_ACCESS_KEY': os.environ.get(
+            'SUPABASE_S3_SECRET_ACCESS_KEY',
+        ),
+    }
+    missing_supabase_settings = [
+        name for name, value in supabase_storage_settings.items() if not value
+    ]
+    if missing_supabase_settings:
+        raise ImproperlyConfigured(
+            'Faltan variables de Supabase Storage: '
+            + ', '.join(missing_supabase_settings),
+        )
+
+    STORAGES = {
+        'default': {
+            'BACKEND': 'storages.backends.s3.S3Storage',
+            'OPTIONS': {
+                'access_key': supabase_storage_settings[
+                    'SUPABASE_S3_ACCESS_KEY_ID'
+                ],
+                'secret_key': supabase_storage_settings[
+                    'SUPABASE_S3_SECRET_ACCESS_KEY'
+                ],
+                'bucket_name': supabase_storage_settings[
+                    'SUPABASE_STORAGE_BUCKET'
+                ],
+                'endpoint_url': supabase_storage_settings[
+                    'SUPABASE_S3_ENDPOINT'
+                ],
+                'region_name': supabase_storage_settings['SUPABASE_S3_REGION'],
+                'signature_version': 's3v4',
+                'addressing_style': 'path',
+                'default_acl': None,
+                'querystring_auth': True,
+                'querystring_expire': 600,
+                'file_overwrite': False,
+            },
+        },
+        'staticfiles': {
+            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+        },
+    }
 
 
 # Email
