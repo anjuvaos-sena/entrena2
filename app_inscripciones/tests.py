@@ -1,43 +1,51 @@
-from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import SimpleTestCase
+from django.test import RequestFactory, SimpleTestCase
 
-from .validators import MAX_PDF_FILE_SIZE, validate_pdf_file
+from .views import _datos_inscripcion
 
 
-class ValidatePdfFileTests(SimpleTestCase):
-	def test_accepts_pdf_with_nonstandard_content_type(self):
+class InscripcionUploadTests(SimpleTestCase):
+	def test_accepts_non_pdf_file_types(self):
 		archivo = SimpleUploadedFile(
-			'requisitos.PDF',
-			b'%PDF-1.7\ncontenido',
-			content_type='application/octet-stream',
+			'imagen.jpg',
+			b'\xff\xd8\xff',
+			content_type='image/jpeg',
+		)
+		request = RequestFactory().post(
+			'/inscripciones/1/inscribirse/',
+			data={
+				'numero_identificacion': '123',
+				'nombres': 'Nombre',
+				'apellidos': 'Apellido',
+				'correo_electronico': 'persona@example.com',
+				'telefono': '123',
+				'centro_formacion': 'Centro',
+				'regional': 'Regional',
+				'archivo_adjunto': archivo,
+			},
 		)
 
-		validate_pdf_file(archivo)
+		_, archivo_recibido, errores = _datos_inscripcion(request)
 
-	def test_rejects_file_without_pdf_signature(self):
-		archivo = SimpleUploadedFile(
-			'requisitos.pdf',
-			b'Esto no es un PDF.',
-			content_type='application/pdf',
+		self.assertEqual(archivo_recibido.name, 'imagen.jpg')
+		self.assertEqual(archivo_recibido.content_type, 'image/jpeg')
+		self.assertNotIn('archivo_adjunto', errores)
+
+	def test_still_requires_an_attachment(self):
+		request = RequestFactory().post(
+			'/inscripciones/1/inscribirse/',
+			data={
+				'numero_identificacion': '123',
+				'nombres': 'Nombre',
+				'apellidos': 'Apellido',
+				'correo_electronico': 'persona@example.com',
+				'telefono': '123',
+				'centro_formacion': 'Centro',
+				'regional': 'Regional',
+			},
 		)
 
-		with self.assertRaisesMessage(
-			ValidationError,
-			'El contenido del archivo no corresponde a un PDF.',
-		):
-			validate_pdf_file(archivo)
+		_, archivo_recibido, errores = _datos_inscripcion(request)
 
-	def test_rejects_file_larger_than_supabase_limit(self):
-		archivo = SimpleUploadedFile(
-			'requisitos.pdf',
-			b'%PDF-1.7',
-			content_type='application/pdf',
-		)
-		archivo.size = MAX_PDF_FILE_SIZE + 1
-
-		with self.assertRaisesMessage(
-			ValidationError,
-			'El archivo no puede superar 50 MB.',
-		):
-			validate_pdf_file(archivo)
+		self.assertIsNone(archivo_recibido)
+		self.assertEqual(errores['archivo_adjunto'], 'Debe adjuntar un archivo.')

@@ -1,14 +1,13 @@
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.validators import validate_email
 from django.db import transaction
 from django.db.models import F, Q
 from django.shortcuts import get_object_or_404, redirect, render
-from django.core.validators import validate_email
 
 from app_convocatorias.models import Convocatoria
 
 from .models import Inscripcion
-from .validators import MAX_PDF_FILE_SIZE_MB, validate_pdf_file
 
 
 def _requiere_instructor(request):
@@ -39,16 +38,11 @@ def _datos_inscripcion(request):
 		if datos['correo_electronico']:
 			errores['correo_electronico'] = 'El correo electrónico no es válido.'
 
-	archivo_pdf = request.FILES.get('archivo_pdf')
-	if archivo_pdf is None:
-		errores['archivo_pdf'] = 'Debe adjuntar un archivo PDF.'
-	else:
-		try:
-			validate_pdf_file(archivo_pdf)
-		except ValidationError as error:
-			errores['archivo_pdf'] = error.messages[0]
+	archivo_adjunto = request.FILES.get('archivo_adjunto')
+	if archivo_adjunto is None:
+		errores['archivo_adjunto'] = 'Debe adjuntar un archivo.'
 
-	return datos, archivo_pdf, errores
+	return datos, archivo_adjunto, errores
 
 
 @login_required
@@ -93,7 +87,7 @@ def capacitaciones_publicadas_view(request):
 
 @login_required
 def crear_inscripcion_view(request, convocatoria_id):
-	"""Registra una inscripción validando estado, año, cupos y PDF."""
+	"""Registra una inscripción y almacena el archivo adjunto."""
 	_requiere_instructor(request)
 	convocatoria = get_object_or_404(Convocatoria, pk=convocatoria_id)
 	if convocatoria.estado != Convocatoria.Estado.PUBLICADA:
@@ -101,7 +95,7 @@ def crear_inscripcion_view(request, convocatoria_id):
 	datos = {}
 	errores = {}
 	if request.method == 'POST':
-		datos, archivo_pdf, errores = _datos_inscripcion(request)
+		datos, archivo_adjunto, errores = _datos_inscripcion(request)
 		if not errores:
 			with transaction.atomic():
 				convocatoria = Convocatoria.objects.select_for_update().get(
@@ -128,7 +122,7 @@ def crear_inscripcion_view(request, convocatoria_id):
 						telefono=datos['telefono'],
 						centro_formacion=datos['centro_formacion'],
 						regional=datos['regional'],
-						archivo_pdf=archivo_pdf,
+						archivo_adjunto=archivo_adjunto,
 					)
 					convocatoria.cupos_asignados += 1
 					convocatoria.save(update_fields=['cupos_asignados'])
@@ -138,7 +132,6 @@ def crear_inscripcion_view(request, convocatoria_id):
 						{
 							'convocatoria': convocatoria,
 							'confirmacion': True,
-							'max_pdf_size_mb': MAX_PDF_FILE_SIZE_MB,
 						},
 					)
 	return render(
@@ -148,6 +141,5 @@ def crear_inscripcion_view(request, convocatoria_id):
 			'convocatoria': convocatoria,
 			'datos': datos,
 			'errores': errores,
-			'max_pdf_size_mb': MAX_PDF_FILE_SIZE_MB,
 		},
 	)

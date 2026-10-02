@@ -12,7 +12,7 @@ class InscripcionAdmin(admin.ModelAdmin):
         'numero_identificacion',
         'convocatoria',
         'fecha_inscripcion',
-        'enlace_archivo_pdf',
+        'enlace_archivo_adjunto',
     )
     search_fields = (
         'nombres',
@@ -20,7 +20,7 @@ class InscripcionAdmin(admin.ModelAdmin):
         'numero_identificacion',
         'correo_electronico',
     )
-    readonly_fields = ('enlace_archivo_pdf',)
+    readonly_fields = ('enlace_archivo_adjunto',)
     fields = (
         'convocatoria',
         'numero_identificacion',
@@ -31,14 +31,14 @@ class InscripcionAdmin(admin.ModelAdmin):
         'centro_formacion',
         'regional',
         'fecha_inscripcion',
-        'enlace_archivo_pdf',
+        'enlace_archivo_adjunto',
     )
 
-    @admin.display(description='PDF adjunto')
-    def enlace_archivo_pdf(self, obj):
-        if not obj or not obj.archivo_pdf:
+    @admin.display(description='Archivo adjunto')
+    def enlace_archivo_adjunto(self, obj):
+        if not obj or not obj.archivo_adjunto:
             return 'Sin archivo'
         return format_html(
-            '<a href="{}" target="_blank" rel="noopener">Abrir PDF</a>',
-            obj.archivo_pdf.url,
+            '<a href="{}" target="_blank" rel="noopener">Abrir archivo</a>',
+            obj.archivo_adjunto.url,
         )
